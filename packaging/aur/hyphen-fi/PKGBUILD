@@ -1,0 +1,71 @@
+# Maintainer: Miika Havo <miika.havo@gmail.com>
+
+pkgname=hyphen-fi
+pkgver=0.9
+pkgrel=1
+pkgdesc="Suomen tavutuskuviot libhyphenille ja LibreOfficelle (hyph_fi_FI.dic)"
+arch=('any')
+url="https://github.com/mhavo/suomen-kieliavut"
+
+# Tällä aineistolla EI ole muodollista lisenssiä. Alkuperäisten TeX-kuvioiden
+# ainoa käyttöehto on README_hyph_fi_FI.txt:n rivi
+#
+#     Patterns may be freely distributed
+#
+# Se ei vastaa mitään SPDX-listan tunnistetta. Archin ohje (RFC 0016,
+# "Use SPDX license identifiers in PKGBUILDs") määrää tällaiseen tapaukseen
+# käyttäjän määrittelemän tunnisteen etuliitteellä LicenseRef-, ja edellyttää
+# että lisenssiteksti toimitetaan pakettiin polkuun
+# /usr/share/licenses/$pkgname/. Tunniste on siis LicenseRef-fihyph
+# (alkuperäisen kuviotiedoston nimen fihyph.tex mukaan) ja teksti toimitetaan
+# alkuperäisenä README:nä, jossa ehto lukee kontekstissaan.
+#
+# Huomaa mitä ehto EI sano: se ei sano mitään muokkaamisesta eikä
+# johdannaisista. Siksi tiedostoa levitetään tässä bitilleen muuttumattomana.
+license=('LicenseRef-fihyph')
+
+# Sama paketinnimi kuin Debianissa tarkoituksella: Debianin hyphen-fi
+# toimittaa saman tiedoston samaan polkuun, ja ohjeiden siirrettävyys
+# distrojen välillä on tämän repon koko idea.
+#
+# EI provides-riviä. Aiempi versio julisti provides=('hyphen-dictionary'),
+# mutta sellaista virtuaalipakettia ei ole olemassa: todennettu tällä koneella
+#     pacman -Si hyphen hyphen-de hyphen-en   ->   Provides: None kaikilla
+# Mikään Archissa ei tarjoa eikä käytä sitä tunnusta. Vertailukohta joka teki
+# virheestä hankalasti huomattavan: hunspell-dictionary ON aito virtuaalipaketti
+# (todennettu Archin hunspell-en_us:n .PKGINFO:sta) — mutta tavutuskuvioilla ei
+# ole vastaavaa.
+optdepends=('hyphen: libhyphen-kirjasto, joka lukee kuviot'
+            'libreoffice-fresh: tavuttaa hunspell-reitillä näillä kuvioilla'
+            'voikko-libreoffice: Voikko tavuttaa LibreOfficessa itse — tällöin näitä ei tarvita')
+
+_baseurl="https://github.com/mhavo/suomen-kieliavut/releases/download/v$pkgver"
+
+source=("$pkgname-$pkgver-hyph_fi_FI.dic::$_baseurl/hyph_fi_FI.dic"
+        "$pkgname-$pkgver-README_hyph_fi_FI.txt::$_baseurl/README_hyph_fi_FI.txt")
+
+# Oikeat summat, ei SKIP: nämä ovat muuttumattomia tietotiedostoja versioidun
+# julkaisun takana, ei liikkuvaa git-viittausta. SKIP tarkoittaisi, että kuka
+# tahansa julkaisuomaisuuden korvaava taho voisi vaihtaa aineiston huomaamatta.
+# hyph_fi_FI.dic:n summa on repon SHA256SUMS-tiedostosta; README:n summa on
+# laskettu erikseen, koska SHA256SUMS ei kata sitä.
+sha256sums=('173ddce030554b91c94f01b5c629eadc224ba8f7ba7d385f6369c6a68565d3a6'
+            'acbf845507566773fb6a4b8e628cbaa8c57133244ebbf3a94d8d272380d0afd3')
+
+package() {
+    # /usr/share/hyphen/ on polku, josta sekä libhyphen että LibreOffice
+    # kuviot löytävät. Arch ei omista tätä hakemistoa lainkaan: `hyphen`
+    # -paketissa on vain kirjasto, otsikko ja substrings.pl (todennettu
+    # pacman -Ql hyphen). Tämä paketti on siis ensimmäinen, joka omistaa
+    # hakemiston sisällön — ja samalla se, joka tekee käsin kopioidusta
+    # tiedostosta pacman -Qo:lle näkyvän.
+    install -Dm644 "$srcdir/$pkgname-$pkgver-hyph_fi_FI.dic" \
+        "$pkgdir/usr/share/hyphen/hyph_fi_FI.dic"
+
+    # Lisenssiteksti alkuperäisellä nimellään: LicenseRef- edellyttää tekstin
+    # mukaan toimittamista, ja tässä tapauksessa "lisenssi" on yksi rivi
+    # keskellä README:tä — se on toimitettava kokonaisuutena, tai ehto
+    # irtoaa asiayhteydestään.
+    install -Dm644 "$srcdir/$pkgname-$pkgver-README_hyph_fi_FI.txt" \
+        "$pkgdir/usr/share/licenses/$pkgname/README_hyph_fi_FI.txt"
+}

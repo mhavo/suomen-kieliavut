@@ -1,0 +1,77 @@
+# Maintainer: Miika Havo <miika.havo@gmail.com>
+
+pkgname=chromium-dict-fi
+pkgver=0.9
+pkgrel=1
+pkgdesc="Suomen oikolukusanasto Chromiumille ja QtWebEnginelle (.bdic, Ginter karsittuna)"
+arch=('any')
+url="https://github.com/mhavo/suomen-kieliavut"
+# Johdannainen dict/ginter-karsittu/:sta, joka on johdettu dict/ginter/:stä.
+# Johdannainen perii lähteensä lisenssin, ks. LICENSES.md.
+license=('CC0-1.0')
+optdepends=('chromium: profiiliin kopiointi, ks. asennusviesti'
+            'qt6-webengine: lukee sanaston suoraan /usr/share/qt6/qtwebengine_dictionaries/:istä'
+            'voikko-fi: morfologinen oikoluku työpöytäsovelluksiin — selaimet eivät osaa sitä')
+install="$pkgname.install"
+
+_baseurl="https://github.com/mhavo/suomen-kieliavut/releases/download/v$pkgver"
+
+source=("$pkgname-$pkgver-fi-FI.bdic::$_baseurl/fi-FI.bdic")
+
+# Oikea summa, ei SKIP: muuttumaton tietotiedosto versioidun julkaisun takana,
+# ei liikkuva git-viittaus. Tässä syy on vieläkin painavampi kuin muissa repon
+# paketeissa: .bdic on läpinäkymätön binäärimuoto, jota kukaan ei tarkasta
+# silmämääräisesti.
+sha256sums=('87aa3a9dde3a1354e3409401cd4c3d70f65a80dd71c40cfb5e54f7d41430a7eb')
+
+package() {
+    # ----------------------------------------------------------------------
+    # Miksi tässä on kaksi eri asennuspolkua
+    #
+    # Chromium EI lue oikolukusanastoa järjestelmästä. Se avaa sanaston
+    # yksinomaan käyttäjän profiilista polusta
+    #     ~/.config/chromium/Dictionaries/<kielikoodi>-<sanastoversio>.bdic
+    # ja lisäksi kieli on erikseen merkittävä oikoluettavaksi profiilin
+    # Preferences-tiedostoon. Järjestelmäpakettina ei siis ole mitään polkua,
+    # johon tiedoston voisi asentaa niin että Chromium löytäisi sen itse.
+    # Paketti ei voi myöskään kirjoittaa käyttäjän profiiliin: pacman ajaa
+    # asennuksen roottina eikä tiedä käyttäjistä mitään.
+    #
+    # Ratkaisu: paketti toimittaa tiedoston omaan hakemistoonsa VALMIIKSI
+    # OIKEALLA NIMELLÄ (fi-3-0.bdic), jolloin käyttöönotto on yksi
+    # kopiointikomento ilman uudelleennimeämistä, ja .install kertoo loput.
+    # Näin tiedosto on myös pacman -Qo:n kannalta omistettu — toisin kuin
+    # käsin kopioituna, mikä on tämän repon toistuva ongelma.
+    #
+    # Nimi fi-3-0.bdic ei ole arvaus: se on mitattu Chromiumin verkkolokista
+    # (ks. docs/convert-dict.md ja tools/chromium-sanastonimi.sh). Se on
+    # kielikohtainen eikä sitä voi päätellä muista kielistä, ja se voi
+    # muuttua Chromiumin päivityksessä.
+    # ----------------------------------------------------------------------
+    install -Dm644 "$srcdir/$pkgname-$pkgver-fi-FI.bdic" \
+        "$pkgdir/usr/share/$pkgname/fi-3-0.bdic"
+
+    # QtWebEngine sen sijaan LUKEE sanaston järjestelmästä. Todennettu:
+    #   - libQt6WebEngineCore.so.6.11.2 sisältää merkkijonot
+    #     "qtwebengine_dictionaries" ja "QTWEBENGINE_DICTIONARIES_PATH"
+    #   - Archin hunspell-en_us 2026.02.25-1 asentaa juuri tähän polkuun
+    #     usr/share/qt6/qtwebengine_dictionaries/en_US.bdic
+    # Muoto on sama kuin Chromiumilla (tiedoston taikaluku on "BDic",
+    # versio 2), joten convert_dict-tuotos kelpaa sellaisenaan.
+    #
+    # Tässä hakemistossa nimi on pelkkä kielitunnus ilman sanastoversiota
+    # (en_US.bdic, ei en-US-10-1.bdic) — Qt hakee sanaston sillä nimellä,
+    # jonka sovellus antaa setSpellCheckLanguages():lle. Toimitetaan sekä
+    # fi että fi_FI, koska sovellukset käyttävät kumpaakin muotoa.
+    install -Dm644 "$srcdir/$pkgname-$pkgver-fi-FI.bdic" \
+        "$pkgdir/usr/share/qt6/qtwebengine_dictionaries/fi.bdic"
+    ln -s fi.bdic "$pkgdir/usr/share/qt6/qtwebengine_dictionaries/fi_FI.bdic"
+
+    # /usr/share/qt/ on Qt-version neutraali yhteensopivuuspolku. Myös tämä
+    # on hunspell-en_us:n tapa, suhteellisilla symlinkeillä qt6:een.
+    install -dm755 "$pkgdir/usr/share/qt/qtwebengine_dictionaries"
+    ln -s ../../qt6/qtwebengine_dictionaries/fi.bdic \
+        "$pkgdir/usr/share/qt/qtwebengine_dictionaries/fi.bdic"
+    ln -s ../../qt6/qtwebengine_dictionaries/fi_FI.bdic \
+        "$pkgdir/usr/share/qt/qtwebengine_dictionaries/fi_FI.bdic"
+}

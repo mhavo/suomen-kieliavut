@@ -1,0 +1,141 @@
+name: julkaisu
+
+# Rakentaa GitHub-releasen kun repoon työnnetään versiotagi (v0.9, v0.9.1, ...).
+#
+# Miksi release eikä pelkkä git-puu: AUR-PKGBUILD tarvitsee pysyvän
+# lataus-URL:n ja tarkistussumman. Ilman releasea paketointi ei ole mahdollista.
+# build/-binäärit pysyvät silti versionhallinnassa — release on niiden lisäksi,
+# ei niiden sijaan. Ks. docs/jakelu.md.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # Koko tarkistus.yml ajetaan tagista ennen kuin mitään julkaistaan. Ilman
+  # tätä v*-tagi voisi osoittaa testaamattomaan committiin ja silti julkaista
+  # artefaktit; tarkistus.yml itse laukeaa vain mainista ja PR:stä.
+  tarkistukset:
+    uses: ./.github/workflows/tarkistus.yml
+    with:
+      # Kattavuusmittaus ei ole päällä pushissa eikä PR:ssä — ks. perustelu
+      # tarkistus.yml:n kattavuus-työssä. Julkaisu on kuitenkin se hetki,
+      # jolloin README:hen kirjatut luvut kannattaa todeta, joten tagista se
+      # ajetaan.
+      aja_kattavuus: true
+
+  julkaise:
+    name: Kokoa ja julkaise
+    needs: tarkistukset
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Portti: tagattua sisältöä ei julkaista jos se ei vastaa summatiedostoa.
+      # Tämä on sama tarkistus jonka loppukäyttäjä ajaa sha256sum -c:llä.
+      - name: build/ ja dict/ vastaavat SHA256SUMS-tiedostoa
+        run: sha256sum -c SHA256SUMS
+
+      # .oxt:tä EI rakenneta tässä, vaan julkaistaan puussa oleva tiedosto.
+      #
+      # Syy on pakottava: build-oxt.sh ei ole tavuntarkka toistaja. zip tallentaa
+      # paketin sisälle kunkin tiedoston mtimen, ja tiedostot syntyvät joka ajossa
+      # uudelleen väliaikaishakemistoon — sama syöte tuottaa siis eri summan joka
+      # kerta (mitattu 2026-09-16: kaksi peräkkäistä ajoa, c6de9c31... ja
+      # 1a3abdc0...). install.sh:n upotettu SUMMA_fi_hunspell_oxt on committoidun
+      # tiedoston summa, joten CI:ssä rakennettu paketti EI voisi koskaan täsmätä
+      # siihen: käyttäjä näkisi "SHA-256 EI TÄSMÄÄ" eli hyökkäyksen joka ajossa.
+      #
+      # Portti on siis toisin päin: tarkistetaan että tagia vastaava .oxt on
+      # puussa, kelvollinen ja summatiedoston kattama. Rakennuksen toimivuus
+      # todetaan tarkistus.yml:ssä, jossa se tehdään versiolla 9.9.
+      - name: Tagia vastaava .oxt on puussa ja kelvollinen
+        id: oxt
+        run: |
+          set -euo pipefail
+          versio="${GITHUB_REF_NAME#v}"
+          oxt="build/fi-hunspell-$versio.oxt"
+          if [ ! -f "$oxt" ]; then
+            echo "$oxt puuttuu puusta." >&2
+            echo "Tagi $GITHUB_REF_NAME edellyttää, että paketti on rakennettu ja" >&2
+            echo "committoitu: tools/build-oxt.sh $versio ginter, sitten SHA256SUMS" >&2
+            echo "ja install.sh:n SUMMA_fi_hunspell_oxt päivitettävä." >&2
+            exit 1
+          fi
+          # Sama summa kuin SHA256SUMS:issa — ja siis sama kuin install.sh:ssa,
+          # jonka tarkistus.yml on jo verrannut summatiedostoon.
+          grep -qF "  $oxt" SHA256SUMS || {
+            echo "$oxt ei ole SHA256SUMS-tiedostossa — julkaistava artefakti" >&2
+            echo "jäisi summaketjun ulkopuolelle." >&2
+            exit 1
+          }
+          tools/tarkista-oxt.py "$oxt" "$versio"
+          echo "versio=$versio" >> "$GITHUB_OUTPUT"
+
+      - name: Laske julkaisun summat
+        run: |
+          set -euo pipefail
+          versio="${GITHUB_REF_NAME#v}"
+          # Summat lasketaan pelkillä tiedostonimillä, koska julkaisussa
+          # artefaktit ovat litteänä listana ilman hakemistorakennetta.
+          # Tiedostot nimetään yksitellen, ei jokerilla: build/ voi sisältää
+          # paikallisia tuotoksia (esim. fi-spell-oma-*.xpi, joka on
+          # .gitignoressa), ja jokeri poimisi ne summatiedostoon vaikka niitä
+          # ei julkaista. Tämän listan on vastattava alla olevaa files:-listaa.
+          ( cd build && sha256sum -- fi-FI.bdic \
+              fi.utf-8.spl fi-spell-0.2.xpi "fi-hunspell-$versio.oxt" ) > /tmp/summat
+          ( cd dict/ginter && sha256sum -- fi_FI.aff fi_FI.dic ) >> /tmp/summat
+          ( cd dict/hyphen && sha256sum -- hyph_fi_FI.dic README_hyph_fi_FI.txt ) >> /tmp/summat
+          # Chromium- ja Firefox-osan työkalut: install.sh noutaa ja varmentaa
+          # nämä, koska putkessa ajettuna sillä ei ole repon työkopiota.
+          ( cd tools && sha256sum -- chromium-ota-kayttoon.sh pref-kirjoitus.py \
+              firefox-ota-kayttoon.sh prefs-js-kirjoitus.py ) >> /tmp/summat
+          # LICENSES.md julkaistaan liitetiedostona (docs/jakelu.md lupaa sen),
+          # joten se kuuluu myös summalistaan — muuten files:-lista ja
+          # summalista eroaisivat toisistaan.
+          sha256sum -- LICENSES.md >> /tmp/summat
+          mv /tmp/summat build/SHA256SUMS-release.txt
+          cat build/SHA256SUMS-release.txt
+
+      - name: Julkaise
+        # Lukittu commit-SHA:han, ei liikkuvaan v2-tagiin: tämä action saa
+        # contents: write -oikeudet, joten siirretty tagi voisi vaihtaa
+        # julkaistavan koodin. Päivitys on tietoinen SHA:n vaihto.
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          # Kolme ryhmää:
+          #
+          #   build/      valmiit binäärit loppukäyttäjälle ja install.sh:lle
+          #   dict/       lähdesanastot, joita packaging/aur/-PKGBUILDit noutavat
+          #   LICENSES.md jaeltavan aineiston lisenssiketju
+          #
+          # Jälkimmäinen ei ole valinnainen: PKGBUILDien source-rivit
+          # osoittavat tähän julkaisuun, joten puuttuva tiedosto rikkoo
+          # AUR-paketin rakennuksen. Ks. packaging/README.md.
+          #
+          # build/fi-FI-myspell-0.7.bdic EI ole listalla. Se on GPL-2.0-only-
+          # johdannainen ja olemassa vain vertailua varten; mikään asennin tai
+          # paketti ei nouda sitä. Binäärin julkaiseminen synnyttäisi GPL-2:n
+          # lähdevaatimuksen turhaan. Tiedosto pysyy repossa, jossa lähde on
+          # samassa puussa. Ks. LICENSES.md.
+          files: |
+            build/fi-FI.bdic
+            build/fi.utf-8.spl
+            build/fi-spell-0.2.xpi
+            build/fi-hunspell-${{ steps.oxt.outputs.versio }}.oxt
+            build/SHA256SUMS-release.txt
+            LICENSES.md
+            dict/ginter/fi_FI.aff
+            dict/ginter/fi_FI.dic
+            dict/hyphen/hyph_fi_FI.dic
+            dict/hyphen/README_hyph_fi_FI.txt
+            tools/chromium-ota-kayttoon.sh
+            tools/pref-kirjoitus.py
+            tools/firefox-ota-kayttoon.sh
+            tools/prefs-js-kirjoitus.py
+          generate_release_notes: true
+          fail_on_unmatched_files: true

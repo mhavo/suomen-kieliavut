@@ -1,0 +1,55 @@
+# Sanasto on käytettävissä heti, mutta omien sanojen lisäys (zg) vaatii
+# kirjoitusoikeuden, jota järjestelmäpolkuun ei ole. Se on syytä kertoa.
+
+post_install() {
+    cat <<'VIESTI'
+
+==> nvim-spell-fi: käyttövalmis ilman konfiguraatiota
+
+        :set spelllang=fi
+        :set spell
+
+    Testi: moottoripyöräonnettomuus ei saa alleviivautua,
+           moottoripyöräonnettomuuz pitää alleviivautua.
+
+    JOS SANASTO EI LÖYDY
+
+      Tiedosto on polussa /usr/share/nvim/site/spell/fi.utf-8.spl. Neovim
+      löytää sen, kun /usr/share/nvim/site on 'runtimepath'issa — näin on
+      oletuksena (nvim --clean). Osa kokoonpannuista jakeluista, esimerkiksi
+      LazyVim, kirjoittaa runtimepath'in uusiksi, jolloin polku katoaa.
+      Tarkista:
+
+          :echo &runtimepath
+
+      Jos /usr/share/nvim/site puuttuu, valitse toinen:
+
+          :set runtimepath+=/usr/share/nvim/site
+          — tai kopioi tiedosto omaan kokoonpanoosi:
+          cp /usr/share/nvim/site/spell/fi.utf-8.spl ~/.config/nvim/spell/
+
+    OMAT SANAT (zg)
+
+      Neovim kirjoittaa zg:llä lisätyt sanat 'spellfile'-asetuksen osoittamaan
+      tiedostoon, joka on oletuksena ensimmäinen kirjoitettavissa oleva
+      runtimepath-hakemisto. Järjestelmäpolkuun ei ole kirjoitusoikeutta,
+      joten aseta se itse:
+
+          :set spellfile=~/.config/nvim/spell/fi.utf-8.add
+
+      Tiedosto on tavallista tekstiä, rivi per sana.
+
+    KATTAVUUS
+
+      Ginterin koko sanasto, 476 291 sanuetta, mitattu kattavuus 87,6 %
+      (63 895 uniikkia sanaa, UD Finnish-TDT + fi-Wikipedia).
+      Hunspell ei tunnista yhdyssanoja, joten osa oikeista suomen sanoista
+      alleviivautuu väärin. Tälle ei ole Neovimissa vaihtoehtoa — Voikkoa
+      Neovim ei osaa käyttää.
+
+VIESTI
+}
+
+post_upgrade() {
+    post_install
+}

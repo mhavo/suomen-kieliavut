@@ -1,0 +1,95 @@
+# Chromiumin osalta pelkkä tiedoston asentaminen ei riitä, eikä paketti voi
+# tehdä loppua käyttäjän puolesta: sanasto luetaan profiilista ja asetus on
+# kirjoitettava Preferences-tiedostoon selain suljettuna. Siksi asennusviesti.
+
+post_install() {
+    cat <<'VIESTI'
+
+==> chromium-dict-fi: QtWebEngine on valmis, Chromium vaatii kaksi käsivaihetta
+
+    VALMISTA ILMAN TOIMENPITEITÄ
+
+      /usr/share/qt6/qtwebengine_dictionaries/fi.bdic
+      /usr/share/qt6/qtwebengine_dictionaries/fi_FI.bdic
+
+      QtWebEngine-pohjaiset sovellukset (Falkon, qutebrowser QtWebEnginellä,
+      KDE:n selainkomponentit) lukevat sanaston suoraan järjestelmästä.
+
+    CHROMIUM JA ELECTRON-SOVELLUKSET — kaksi vaihetta
+
+      Chromium ei lue sanastoa järjestelmästä lainkaan. Se avaa vain yhden
+      tiedoston omasta profiilistaan, ja nimen on oltava tarkalleen oikea.
+      Paketti toimittaa tiedoston valmiiksi oikealla nimellä:
+
+          /usr/share/chromium-dict-fi/fi-3-0.bdic
+
+      1) Kopioi se profiiliin (KÄYTTÄJÄNÄ, ei roottina):
+
+             install -Dm644 /usr/share/chromium-dict-fi/fi-3-0.bdic \
+                 ~/.config/chromium/Dictionaries/fi-3-0.bdic
+
+         Electron-sovellukselle sama, mutta sen omaan hakemistoon:
+         ~/.config/<sovellus>/Dictionaries/fi-3-0.bdic
+
+      2) Merkitse suomi oikoluettavaksi. TÄTÄ EI VOI TEHDÄ ASETUKSISTA:
+         suomi ei ole Chromiumin tuettujen oikolukukielten listassa, joten
+         chrome://settings/languages ei tarjoa suomelle oikolukurastia.
+         Asetus on kirjoitettava profiilin Preferences-tiedostoon
+         (avain spellcheck.dictionaries) SELAIN KOKONAAN SULJETTUNA —
+         Chromium ylikirjoittaa tiedoston lopettaessaan.
+
+         Repon skripti tekee tämän: tools/chromium-ota-kayttoon.sh
+
+    JOS OIKOLUKU LAKKAA TOIMIMASTA CHROMIUMIN PÄIVITYKSEN JÄLKEEN
+
+      Tiedostonimen versio-osa (3-0) on Chromiumin SISÄINEN sanastoversio:
+      kovakoodattu selaimen lähdekoodiin, kielikohtainen (en-US on 10-1,
+      suomi 3-0) ja selaimen päivityksen mukana muuttuva. Kun se muuttuu,
+      paketti lakkaa toimimasta TÄYSIN HILJAISESTI — ei virhettä, ei
+      varoitusta, oikoluku vain ei ole päällä.
+
+      Tarkista mitä nimeä tämä Chromium oikeasti hakee. Komento ajaa
+      kertakäyttöisen profiilin, jossa suomen oikoluku on päällä mutta
+      sanastoa ei ole; selain yrittää silloin noutaa puuttuvan tiedoston ja
+      kirjoittaa tarkan nimen lokiin (nouto epäonnistuu — se on sivuseikka):
+
+          d=$(mktemp -d); mkdir -p "$d/Default"
+          printf '%s' '{"intl":{"accept_languages":"fi,en-US,en"},
+            "spellcheck":{"dictionaries":["fi"],"dictionary":""},
+            "browser":{"enable_spellchecking":true}}' > "$d/Default/Preferences"
+          timeout 90 chromium --headless=new --no-sandbox --disable-gpu \
+            --user-data-dir="$d" --enable-logging=stderr --v=1 \
+            --virtual-time-budget=5000 --dump-dom \
+            "data:text/html,<textarea>x</textarea>" >/dev/null 2>"$d/log.txt"
+          grep -oE 'fi-[0-9]+-[0-9]+\.bdic' "$d/log.txt" | head -1
+          rm -rf "$d"
+
+      Jos tulos on muu kuin fi-3-0.bdic, nimeä profiilikopiosi uudelleen:
+
+          mv ~/.config/chromium/Dictionaries/fi-3-0.bdic \
+             ~/.config/chromium/Dictionaries/<uusi-nimi>
+
+      Sama mittaus skriptinä: tools/chromium-sanastonimi.sh repossa
+      https://github.com/mhavo/suomen-kieliavut
+
+    HUOM: tämä sanasto on karsittu 245 000 sanueeseen, koska Ginterin koko
+    sanasto (476 291) ei mahdu .bdic-muotoon. Mitattu kattavuus 76,2 %
+    (63 895 uniikkia sanaa, UD Finnish-TDT + fi-Wikipedia).
+    Työpöytäsovelluksissa käytä Voikkoa (voikko-fi), se on selvästi parempi.
+
+VIESTI
+}
+
+post_upgrade() {
+    post_install
+}
+
+post_remove() {
+    cat <<'VIESTI'
+
+==> chromium-dict-fi poistettu. Profiiliin kopioitu
+    ~/.config/chromium/Dictionaries/fi-3-0.bdic EI poistunut — se ei ole
+    paketin omistama. Poista se itse, jos et enää tarvitse sitä.
+
+VIESTI
+}

@@ -1,0 +1,28 @@
+# convert_dict-työkaluketju (153 MB esikäännettyjä binäärejä) noudetaan
+# ajohetkellä välimuistiin, ks. tools/build-bdic.sh
+.cache/
+convert-dict-tool-from-chromium/
+*.bdic.tmp
+
+# build-xpi.sh:n tuotokset — alkuperäinen fi-spell-0.2.xpi on versionhallinnassa
+build/fi-spell-oma-*.xpi
+
+# py_compile-välimuisti
+__pycache__/
+
+# build-oxt.sh:n varianttitestit. Toimitettava build/fi-hunspell-0.9.oxt on
+# versionhallinnassa kuten muutkin build/-binäärit; CI rakentaa testinsä
+# versionumerolla 9.9 juuri siksi, ettei toimitettu paketti voi vahingossa
+# vaihtua ajossa.
+build/fi-hunspell-9.9.oxt
+
+handoff.md
+
+# muuli workflow artifacts: committed by default. Only genuine ephemerals are
+# ignored — each with a stated reason. <BASE> = .muuli-workflows
+.muuli-workflows/**/spec-loop/     # redteam.md is deleted each round; never a deliverable
+.muuli-workflows/audit-*/          # per-run raw working dir; the committed deliverable is the REMEDIATION plan
+.muuli-workflows/**/*.handoff.md   # ralph transient coordination state, regenerated each handoff
+
+# testi/-ajojen lokit
+testi/tulokset/

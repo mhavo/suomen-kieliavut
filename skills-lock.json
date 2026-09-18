@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "skills": {
+    "handing-off": {
+      "source": "mhavo/muuli",
+      "sourceType": "github",
+      "skillPath": "skills/handing-off/SKILL.md",
+      "computedHash": "4b3b2cf9914d4b559f8183104c74f3149823205860d800f8ab9c270d6f2ae919"
+    },
+    "planning-waves": {
+      "source": "mhavo/muuli",
+      "sourceType": "github",
+      "skillPath": "skills/planning-waves/SKILL.md",
+      "computedHash": "558a3bb86a9b2fd83bd803e35f68b4dd644872320217149959a3396bf8333246"
+    },
+    "supervising-waves": {
+      "source": "mhavo/muuli",
+      "sourceType": "github",
+      "skillPath": "skills/supervising-waves/SKILL.md",
+      "computedHash": "082562a1bad2703311debc896aa9e8e738e58e27505a5ca48814273591539bbb"
+    },
+    "using-muuli": {
+      "source": "mhavo/muuli",
+      "sourceType": "github",
+      "skillPath": "skills/using-muuli/SKILL.md",
+      "computedHash": "2cc50f8c99fcb2e756bb21ffdd0222c1d861c541daede2ebd654165d5551a34e"
+    },
+    "writing-specs": {
+      "source": "mhavo/muuli",
+      "sourceType": "github",
+      "skillPath": "skills/writing-specs/SKILL.md",
+      "computedHash": "db8ba264c031d1dcfad34bf66e5136b3f1a3dfe4b0b3c88cc86ee036f22a4e9a"
+    }
+  }
+}

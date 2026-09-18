@@ -1,0 +1,37 @@
+# Repon binääriset tuotokset. Tarkistus: sha256sum -c SHA256SUMS
+#
+# Rakennettu 2026-09-16 työkaluilla:
+#   convert_dict  jankelemen/convert-dict-tool-from-chromium @ b78ff3a1
+#                 (Chromium-pohjainen, esikäännetty; ks. tools/convert-dict.sha256)
+#   :mkspell      NVIM v0.12.5
+#   build-oxt.sh  zip -qrX (Ginterin koko sanasto, ei kokorajaa kuten .bdic:ssä)
+#   hunspell      @(#) International Ispell Version 3.2.06 (but really Hunspell 1.7.3)
+#   lokaali       C.UTF-8 (pakotettu, ks. tools/build-bdic.sh)
+#
+# fi-spell-0.2.xpi EI ole täällä rakennettu: se on upstreamin alkuperäinen
+# julkaisu (fginter/hunspell-fi release 0.2) bitilleen sellaisenaan.
+#
+87aa3a9dde3a1354e3409401cd4c3d70f65a80dd71c40cfb5e54f7d41430a7eb  build/fi-FI.bdic
+6ebcf8de1deb0f034fa8cc3cc2aa57a9a4a4af5d7abc1c677978698f749ffebd  build/fi-FI-myspell-0.7.bdic
+eccc5b95edb4f49ca3ef9a322b40e2831d5919016eaa8bda57afed924cb91327  build/fi.utf-8.spl
+6706e537ede8c73dff923f879fd80327df44b9e71d44f2f77fb470465ab0266f  build/fi-hunspell-0.9.oxt
+95ded62bc3de347c91d7c91e8d2abb2405e3475bfb7bf735070db11198131a81  build/fi-spell-0.2.xpi
+#
+# Lähdesanastot:
+027d87effa5c4c629e912d22e052d68fba450bd2849401f5459a3da09b86723d  dict/ginter/fi_FI.aff
+7015bf1eba98f52f29428117687e08d657ffc189c13960734ff3083d572c98db  dict/ginter/fi_FI.dic
+91fb33a603abf3b05c5c074a8ce743a2def33b61d5b9dfe8e5eb107e20c92670  dict/ginter/fi_FI.dic_delta
+854a0081e1d1afd535947dd30b70ffe8ef91d77a522e2469132ae2cbcedce074  dict/ginter-karsittu/fi_FI.dic
+1cc37b815e179a655c5312b4a70d58596c2bfc541590215ae6e7815efa8b572c  dict/myspell-fi-0.7/fi-FI.aff
+7e9ab3d034fe321f061b9a04aad9b12313335149c648a82fb28846ed2f033f80  dict/myspell-fi-0.7/fi-FI.dic
+173ddce030554b91c94f01b5c629eadc224ba8f7ba7d385f6369c6a68565d3a6  dict/hyphen/hyph_fi_FI.dic
+
+# Chromium- ja Firefox-osan työkalut. Nämä eivät ole binäärisiä tuotoksia vaan koodia,
+# mutta ne julkaistaan liitetiedostoina ja install.sh varmentaa ne samalla
+# tavalla kuin sanastot — putkessa ajettu asennin ei voi lukea niitä repon
+# työkopiosta. Muutos näihin tiedostoihin vaatii siis myös uuden summan
+# tähän ja install.sh:hon; tarkistus.yml vertaa niitä keskenään.
+4799645d56dc05625dd4ce04b60a6483686da75c383fec547c266ff7d41e22ed  tools/chromium-ota-kayttoon.sh
+24bea6dc68a7d6c793250743946a8b9da09c0729e611e1f9fa3c2fc46f935209  tools/pref-kirjoitus.py
+76c613933906262afde7da7ec0684c7b72a6b0c9da8c143b27351710fc149e0b  tools/firefox-ota-kayttoon.sh
+70c060c8c3030d36dab990de8ead8bd8941fd1ac655e89ea075ea4e437002c39  tools/prefs-js-kirjoitus.py

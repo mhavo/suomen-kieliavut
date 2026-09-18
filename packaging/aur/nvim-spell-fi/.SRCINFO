@@ -1,0 +1,14 @@
+pkgbase = nvim-spell-fi
+	pkgdesc = Suomen oikolukusanasto Neovimille (fi.utf-8.spl, Ginterin koko sanasto)
+	pkgver = 0.9
+	pkgrel = 1
+	url = https://github.com/mhavo/suomen-kieliavut
+	install = nvim-spell-fi.install
+	arch = any
+	license = CC0-1.0
+	depends = neovim
+	optdepends = voikko-fi: morfologinen oikoluku työpöytäsovelluksiin — Neovim ei osaa sitä
+	source = nvim-spell-fi-0.9-fi.utf-8.spl::https://github.com/mhavo/suomen-kieliavut/releases/download/v0.9/fi.utf-8.spl
+	sha256sums = eccc5b95edb4f49ca3ef9a322b40e2831d5919016eaa8bda57afed924cb91327
+
+pkgname = nvim-spell-fi

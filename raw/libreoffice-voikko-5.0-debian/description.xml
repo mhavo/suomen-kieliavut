@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<description xmlns="http://openoffice.org/extensions/description/2006"
+             xmlns:d="http://openoffice.org/extensions/description/2006"
+             xmlns:xlink="http://www.w3.org/1999/xlink">
+
+  <version value="5.0" />
+  <identifier value="org.puimula.ooovoikko" />
+
+  <display-name>
+    <name lang="en-US">Writing aids based on Voikko</name>
+    <name lang="fi">Voikko-pohjaiset kirjoituksen aputyökalut</name>
+  </display-name>
+
+  <!-- SHOW_LICENSE
+  <registration>
+    <simple-license accept-by="admin" default-license-id="en-US" suppress-if-required="true">
+      <license-text xlink:href="license_fi.txt" lang="fi" />
+      <license-text xlink:href="license_en-US.txt" lang="en-US" license-id="en-US" />
+    </simple-license>
+  </registration>
+  SHOW_LICENSE -->
+
+  <publisher>
+    <name xlink:href="http://voikko.puimula.org" lang="fi">Voikon kehittäjäyhteisö</name>
+    <name xlink:href="http://voikko.puimula.org" lang="en">Voikko development community</name>
+  </publisher>
+
+  <icon>
+    <default xlink:href="icon.png" />
+  </icon>
+
+</description>

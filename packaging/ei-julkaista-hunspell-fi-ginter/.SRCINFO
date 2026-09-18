@@ -1,0 +1,19 @@
+pkgbase = hunspell-fi-ginter
+	pkgdesc = Suomen hunspell-sanasto, Filip Ginterin muunnos (476 291 sanuetta)
+	pkgver = 0.9
+	pkgrel = 1
+	url = https://github.com/mhavo/suomen-kieliavut
+	install = hunspell-fi-ginter.install
+	arch = any
+	license = CC0-1.0
+	optdepends = hunspell: oikolukukirjasto ja komentorivityökalut
+	optdepends = libreoffice-fresh: käyttää sanastoa suoraan /usr/share/hunspell/:istä
+	optdepends = hyphen-fi: suomen tavutuskuviot, jos käytät hunspell-reittiä LibreOfficessa
+	optdepends = voikko-fi: morfologinen oikoluku — parempi kaikkialla missä se toimii
+	provides = hunspell-dictionary
+	source = hunspell-fi-ginter-0.9-fi_FI.aff::https://github.com/mhavo/suomen-kieliavut/releases/download/v0.9/fi_FI.aff
+	source = hunspell-fi-ginter-0.9-fi_FI.dic::https://github.com/mhavo/suomen-kieliavut/releases/download/v0.9/fi_FI.dic
+	sha256sums = 027d87effa5c4c629e912d22e052d68fba450bd2849401f5459a3da09b86723d
+	sha256sums = 7015bf1eba98f52f29428117687e08d657ffc189c13960734ff3083d572c98db
+
+pkgname = hunspell-fi-ginter

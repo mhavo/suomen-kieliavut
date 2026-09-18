@@ -1,0 +1,88 @@
+# Maintainer: Miika Havo <miika.havo@gmail.com>
+#
+# ============================================================================
+#  TÄTÄ PAKETTIA EI JULKAISTA. Hakemisto on tarkoituksella packaging/aur/:n
+#  ULKOPUOLELLA, jottei se lähde AUR:iin vahingossa.
+#
+#  Syy: tämä on ainoa repon komponentti, jolla on globaali, ei-konfiguroitava
+#  haittavaikutus. Se vie enchantilta tunnuksen fi_FI, jolloin työpöydän
+#  oikoluku vaihtuu Voikosta tähän sanalistaan KAIKISSA fi_FI-tunnusta
+#  pyytävissä sovelluksissa. enchant.ordering EI korjaa tilannetta (mitattu,
+#  ks. packaging/README.md), ja ainoa peruutuskeino on paketin poisto.
+#
+#  Sen ainoa hyöty — hunspell-reitin LibreOffice — katetaan jo .oxt-paketilla,
+#  joka on opt-in eikä kosketa järjestelmän enchant-tunnusavaruutta.
+#
+#  Koodi säilytetään, koska se on paras dokumentaatio siitä, miksi tätä ei
+#  kannata tehdä. Jos paketti joskus julkaistaan, se tarvitsee vähintään
+#  (a) eri nimen ilman hunspell-fi-varausta ja (b) .install-viestin, joka
+#  kertoo haitan ENNEN asennusta eikä sen jälkeen.
+# ============================================================================
+
+pkgname=hunspell-fi-ginter
+pkgver=0.9
+pkgrel=1
+pkgdesc="Suomen hunspell-sanasto, Filip Ginterin muunnos (476 291 sanuetta)"
+arch=('any')
+url="https://github.com/mhavo/suomen-kieliavut"
+# Upstream (fginter/hunspell-fi) ilmoittaa README:ssään lisenssiksi pelkän
+# "CC0". Tulkitaan se SPDX-tunnisteeksi CC0-1.0 — muuta CC0-versiota ei ole.
+# Lisenssitekstiä EI toimiteta pakettiin: CC0-1.0 on SPDX-listalla, ja Archin
+# `licenses`-paketti tarjoaa tekstin polussa /usr/share/licenses/spdx/.
+# Upstream ei myöskään toimita erillistä LICENSE-tiedostoa, ks. LICENSES.md.
+license=('CC0-1.0')
+# 'hunspell-dictionary' on Archin virallisten hunspell-*-pakettien käyttämä
+# virtuaalipaketti (todennettu: hunspell-en_us 2026.02.25-1 .PKGINFO sisältää
+# rivin `provides = hunspell-dictionary`). Sen kautta muut paketit voivat
+# riippua "jostakin sanastosta".
+# 'hunspell-fi' varataan tässä, jotta AUR:iin ei synny kahta pakettia samasta
+# tiedostoparista /usr/share/hunspell/fi_FI.*.
+# hunspell-fi-nimen varaus ja conflicts on poistettu: julkaisematon paketti
+# ei saa varata AUR:sta nimeä, eikä jaeltavaksi kelpaamaton paketti saa
+# julistaa korvaavansa toista.
+provides=('hunspell-dictionary')
+optdepends=('hunspell: oikolukukirjasto ja komentorivityökalut'
+            'libreoffice-fresh: käyttää sanastoa suoraan /usr/share/hunspell/:istä'
+            'hyphen-fi: suomen tavutuskuviot, jos käytät hunspell-reittiä LibreOfficessa'
+            'voikko-fi: morfologinen oikoluku — parempi kaikkialla missä se toimii')
+install="$pkgname.install"
+
+_baseurl="https://github.com/mhavo/suomen-kieliavut/releases/download/v$pkgver"
+
+# Lähdetiedostot nimetään uudelleen paketin ja version mukaan, koska pelkät
+# nimet fi_FI.aff / fi_FI.dic ovat geneerisiä ja törmäisivät jaetussa
+# SRCDEST-välimuistissa toisen sanastopaketin kanssa.
+source=("$pkgname-$pkgver-fi_FI.aff::$_baseurl/fi_FI.aff"
+        "$pkgname-$pkgver-fi_FI.dic::$_baseurl/fi_FI.dic")
+
+# Summat ovat repon SHA256SUMS-tiedoston arvoja, eivät SKIP.
+# Peruste: nämä ovat muuttumattomia tietotiedostoja versioidun julkaisun
+# takana, ei liikkuvaa git-viittausta. SKIP tarkoittaisi että kuka tahansa
+# julkaisuomaisuuden korvaava taho voisi vaihtaa sanaston huomaamatta —
+# ja sanasto on juuri se osa, jota käyttäjä ei lue läpi.
+sha256sums=('027d87effa5c4c629e912d22e052d68fba450bd2849401f5459a3da09b86723d'
+            '7015bf1eba98f52f29428117687e08d657ffc189c13960734ff3083d572c98db')
+
+package() {
+    # Nimeksi fi_FI, ei fi: sekä hunspell että enchant ja Sonnet etsivät
+    # sanastoa <kielitunnus>.aff/.dic -parina, ja lähdeaineiston affiksisäännöt
+    # on kirjoitettu fi_FI-parille. Ks. myös .install — nimivalinnalla on
+    # seurauksia siihen, kumpi taustaosa vastaa mistäkin kielitunnuksesta.
+    install -Dm644 "$srcdir/$pkgname-$pkgver-fi_FI.aff" \
+        "$pkgdir/usr/share/hunspell/fi_FI.aff"
+    install -Dm644 "$srcdir/$pkgname-$pkgver-fi_FI.dic" \
+        "$pkgdir/usr/share/hunspell/fi_FI.dic"
+
+    # /usr/share/myspell/dicts/ -symlinkit. Tämä on Archin hunspell-*-pakettien
+    # vakiintunut tapa, ei arvaus: hunspell-en_us 2026.02.25-1 sisältää
+    #   usr/share/myspell/dicts/en_US.aff -> /usr/share/hunspell/en_US.aff
+    # eli ABSOLUUTTISET symlinkit /usr/share/hunspell/:iin (todennettu paketin
+    # sisällysluettelosta). Vanhemmat sovellukset ja Sonnetin hunspell-liitännäinen
+    # etsivät edelleen myspell-polusta.
+    install -dm755 "$pkgdir/usr/share/myspell/dicts"
+    local f
+    for f in "$pkgdir"/usr/share/hunspell/*; do
+        ln -s "/usr/share/hunspell/${f##*/}" \
+            "$pkgdir/usr/share/myspell/dicts/${f##*/}"
+    done
+}

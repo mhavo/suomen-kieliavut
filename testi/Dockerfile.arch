@@ -1,0 +1,84 @@
+# Arch Linux -testiympäristö.
+#
+# Kuvassa on VAIN hidas ja vakaa ympäristö (§2.1). Voikko-paketit puuttuvat
+# tarkoituksella (§2.2, R2).
+#
+# SELAIMIA EI ASENNETA: ks. Dockerfile.ubuntu, sama perustelu (R6).
+#
+# YAY RAKENNETAAN OMASSA VAIHEESSAAN (§2.3): install.sh ehdottaa Archissa
+# komentoa "yay -S --needed voikko-fi voikko-libreoffice", ja
+# voikko-libreoffice on olemassa vain AURissa. Ilman yayta testi ajaisi
+# komennon jota käyttäjä ei koskaan aja.
+
+# --- rakennusvaihe: yay-bin ------------------------------------------------
+FROM archlinux:base-devel AS yay-rakennus
+RUN pacman -Syu --noconfirm --needed git
+RUN useradd -m rakentaja \
+    && printf 'rakentaja ALL=(ALL) NOPASSWD:ALL\n' > /etc/sudoers.d/rakentaja
+USER rakentaja
+WORKDIR /home/rakentaja
+# makepkg tuottaa KAKSI pakettia: Archin /etc/makepkg.conf:ssa on oletuksena
+# OPTIONS=(strip ... debug ...) eikä yay-binin PKGBUILDissa ole options-riviä
+# kumoamassa sitä, joten Go-binäärin DWARF-tiedot irrotetaan omaksi paketikseen
+# yay-bin-debug-*.pkg.tar.zst. Glob ./*.pkg.tar.* osuisi molempiin, jolloin cp
+# tulkitsisi kohteen hakemistoksi. Valitaan siksi vain versionumerolla alkava
+# paketti — ja varmistetaan että niitä on tasan yksi, jottei tämä hajoa
+# äänettömästi jos paketointi joskus muuttuu. makepkg --packagelist ei kelpaa
+# valintaan: sekin listaa debug-paketin.
+RUN git clone --depth 1 https://aur.archlinux.org/yay-bin.git \
+    && cd yay-bin && makepkg --noconfirm \
+    && ls -1 ./yay-bin-[0-9]*.pkg.tar.* \
+    && [ "$(ls -1 ./yay-bin-[0-9]*.pkg.tar.* | wc -l)" -eq 1 ] \
+    && cp ./yay-bin-[0-9]*.pkg.tar.* /home/rakentaja/yay.pkg.tar.zst
+
+# --- varsinainen kuva -------------------------------------------------------
+FROM archlinux:base-devel
+
+RUN pacman -Syu --noconfirm --needed \
+        curl sudo jq unzip file git \
+        python \
+        libreoffice-fresh \
+        hunspell hunspell-en_us \
+        enchant \
+        neovim \
+        util-linux \
+    && pacman -Scc --noconfirm
+
+COPY --from=yay-rakennus /home/rakentaja/yay.pkg.tar.zst /tmp/yay.pkg.tar.zst
+RUN pacman -U --noconfirm /tmp/yay.pkg.tar.zst && rm /tmp/yay.pkg.tar.zst
+
+# yay ei saa kysyä mitään. Kääre lisää pelkän vahvistuksen ohituksen — komento
+# ja paketit pysyvät niinä jotka install.sh ajaa, eli §2.3:n vaatimus
+# "sama komento kuin käyttäjällä" säilyy.
+RUN printf '#!/bin/sh\nexec /usr/bin/yay --noconfirm --answerdiff None --answerclean None --answeredit None "$@"\n' \
+        > /usr/local/bin/yay \
+    && chmod 0755 /usr/local/bin/yay
+
+# Virallinen archlinux-image jättää lokaalimäärittelyt purkamatta:
+#   NoExtract = usr/share/locale/* usr/share/X11/locale/* usr/share/i18n/*
+#   NoExtract = !usr/share/*locales/en_?? !usr/share/*locales/i18n* ...
+#   NoExtract = !usr/share/*locales/C !usr/share/*locales/POSIX
+#               !usr/share/i18n/charmaps/ANSI_X3.4-1968.gz
+# /usr/share/i18n/locales/fi_FI ei siis ole imagessa, jolloin locale-gen ei voi
+# generoida fi_FI.UTF-8:aa vaikka locale.gen-rivi olisi auki — ja jäljelle jää
+# juuri ANSI_X3.4-1968. Mitattu 2026-09-18: skenaario 01 pysähtyi tähän
+# koodilla VIRHE(4). Poistetaan siksi lokaaleja koskevat NoExtract-rivit ja
+# asennetaan glibc uudelleen; man- ja info-sivujen rajaus jää voimaan.
+#
+# Viimeinen rivi on rakennusaikainen portti: ilman sitä puuttuva lokaali
+# paljastuu vasta skenaarion ajossa, kaukana syystään.
+RUN sed -i '/^NoExtract.*\(locale\|i18n\)/d' \
+        /etc/pacman.conf $(ls /etc/pacman.conf.d/*.conf 2>/dev/null) \
+    && pacman -Sy --noconfirm --overwrite '*' glibc \
+    && pacman -Scc --noconfirm \
+    && sed -i 's/^#\(fi_FI.UTF-8 UTF-8\)/\1/' /etc/locale.gen \
+    && locale-gen \
+    && locale -a | grep -qix 'fi_FI.utf8'
+ENV LANG=fi_FI.UTF-8
+
+RUN useradd -m -s /bin/bash testi \
+    && printf 'testi ALL=(ALL) NOPASSWD:ALL\n' > /etc/sudoers.d/testi \
+    && chmod 0440 /etc/sudoers.d/testi
+
+USER testi
+WORKDIR /home/testi

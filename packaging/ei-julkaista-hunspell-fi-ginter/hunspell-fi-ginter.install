@@ -1,0 +1,98 @@
+# Tämä paketti muuttaa järjestelmän oikolukutilannetta laajemmin kuin
+# pelkän tiedoston asentamisen verran, joten asennuksen yhteydessä on
+# kerrottava mitä tapahtuu. Kaikki alla oleva on mitattu tällä alustalla
+# (Arch, enchant 2.8.21, sonnet 6.29.0) — ei kopioitu dokumentaatiosta.
+
+post_install() {
+    cat <<'VIESTI'
+
+==> hunspell-fi-ginter: suomelle on nyt kaksi oikolukutaustaosaa
+
+    Ennen tätä pakettia hunspellilla ei ollut suomen sanastoa lainkaan,
+    joten Voikko oli ainoa suomen tarjoaja eikä taustaosien järjestystä
+    tarvinnut pakottaa. Nyt tarjoajia on kaksi.
+
+    ENCHANT (GTK-sovellukset, WebKitGTK, gedit, Geany...)
+
+      Sanasto asentui nimellä fi_FI, Voikko rekisteröityy nimellä fi.
+      Mitattu tulos (enchant-lsmod-2):
+
+          fi     -> voikko     (ennallaan)
+          fi_FI  -> hunspell   (UUSI — ennen tätä pakettia myös fi_FI
+                                ohjautui Voikolle, koska muuta ei ollut)
+
+      Sovellus, joka pyytää kielen nimellä "fi_FI" (esimerkiksi lokaalista
+      fi_FI.UTF-8), saa siis tästedes hunspellin, ei Voikkoa. Se on huonompi:
+      hunspell ei tunnista yhdyssanoja eikä osaa kielentarkistusta.
+
+      ~/.config/enchant/enchant.ordering EI korjaa tätä. Rivit
+
+          fi_FI:voikko
+          *:voikko
+
+      on kokeiltu: enchant vastaa yhä "fi_FI (hunspell)", koska Voikko ei
+      tarjoa tunnusta fi_FI täsmällisesti vaan vain tunnuksen fi, ja
+      järjestystiedosto vaikuttaa vasta täsmäävien tarjoajien kesken.
+      Ordering-tiedosto auttaa vain samalla tunnuksella olevaan törmäykseen:
+
+          fi:voikko      # tehoaa, jos joku asentaa /usr/share/hunspell/fi.*
+
+      Ainoa varma tapa saada Voikko takaisin fi_FI:lle on poistaa tämä
+      paketti. Jos tarvitset hunspell-sanastoa vain selaimiin ja Neovimiin,
+      harkitse paketteja chromium-dict-fi ja nvim-spell-fi tämän sijaan —
+      ne eivät koske enchantiin lainkaan.
+
+    KDE / SONNET (Kate, KMail, Qt-tekstikentät)
+
+      Sonnet lataa liitännäiset /usr/lib/qt6/plugins/kf6/sonnet/:istä ja
+      valitsee kielelle sen tarjoajan, jonka reliability() on suurin.
+      Lähdekoodin arvot: Voikko 50, Hunspell 40 — Voikko voittaa, kun
+      molemmat tarjoavat saman kielitunnuksen. Pakotusta ei siis pitäisi
+      tarvita.
+
+      Jos tarvitset pakotusta, asetus on QSettings-muotoinen ja menee
+      tiedostoon
+
+          ~/.config/KDE/Sonnet.conf
+
+      avaimella defaultClient (arvot "Voikko" ja "Hunspell", isot
+      alkukirjaimet). Avaimet ovat ryhmässä [General], koska Sonnet ei
+      kutsu beginGroup():ia:
+
+          [General]
+          defaultClient=Voikko
+
+      TÄMÄ ASETUS ON GLOBAALI, EI KIELIKOHTAINEN — toisin kuin enchantin
+      "fi:voikko". Se ei kuitenkaan riko muita kieliä: Sonnet tarkistaa
+      Loader::createSpeller():issä, tukeeko oletustaustaosa pyydettyä
+      kieltä, ja jos ei, se nollaa valinnan ja palaa kielen omaan
+      parhaaseen taustaosaan. Englanti siis jatkaa hunspellilla.
+      Hinta on lokimeteli: jokaisesta muun kielen tarkistuksesta tulee
+      varoitus "Default client Voikko doesn't support language: en_US".
+
+      ÄLÄ TEE TÄTÄ VARMUUDEN VUOKSI. Sonnet suosii Voikkoa suomelle jo
+      oletuksena (reliability 50 vs. 40), joten asetus on tarpeeton
+      ellei jokin oikeasti mene pieleen.
+
+      HUOM: koko Sonnet-osuus on luettu kirjastosta ja upstreamin
+      lähdekoodista. Sitä EI ole todennettu ajamalla KDE-sovelluksella.
+
+    VOIKKO ON YHÄ ENSISIJAINEN. Tämä sanasto on tarkoitettu sinne, missä
+    Voikkoa ei voi käyttää: selaimiin ja Neovimiin.
+
+VIESTI
+}
+
+post_upgrade() {
+    post_install
+}
+
+post_remove() {
+    cat <<'VIESTI'
+
+==> hunspell-fi-ginter poistettu. Suomen enchant-tunnukset palaavat Voikolle.
+    Poista tarvittaessa myös ~/.config/enchant/enchant.ordering, jos lisäsit
+    sinne rivejä tämän paketin takia.
+
+VIESTI
+}

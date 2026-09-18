@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fi">
+<meta charset="utf-8">
+<title>Suomen oikoluvun testi</title>
+<style>
+  body { font: 16px/1.6 system-ui, sans-serif; max-width: 48em; margin: 2em auto; padding: 0 1em; color: #222; }
+  textarea { width: 100%; height: 4.5em; font-size: 1.05em; padding: .6em; box-sizing: border-box; }
+  h2 { font-size: 1.05em; margin-top: 2em; }
+  code { background: #eee; padding: .1em .35em; border-radius: 3px; }
+  .ohje { background: #f5f5f5; border-left: 4px solid #777; padding: 1em 1.2em; margin-top: 2em; }
+  .ohje h2 { margin-top: 0; }
+  p.pieni { color: #555; font-size: .92em; }
+</style>
+
+<h1>Suomen oikoluvun testi</h1>
+
+<p>Tämä sivu tarkistaa, toimiiko suomen oikoluku selaimessa. Se ei tarvitse
+verkkoyhteyttä — avaa tiedosto suoraan selaimeen.</p>
+
+<h2>1. Oikein kirjoitetut sanat — ei pitäisi alleviivautua</h2>
+<textarea spellcheck="true">talo taloissamme maastopyörä polkupyörä kännykkä sähköposti verkkosivusto linja-autoasema Helsingissä älypuhelin kissanruoka pyöräillä</textarea>
+
+<h2>2. Virheellisesti kirjoitetut — pitäisi alleviivautua kaikki</h2>
+<textarea spellcheck="true">kissanrooka pyorailla mastopyörä sähköpsti Helsingisä qwertyxyz</textarea>
+
+<h2>3. Sama kuin kohta 1, mutta kenttä on merkitty <code>lang="fi"</code></h2>
+<textarea lang="fi" spellcheck="true">talo taloissamme maastopyörä kännykkä kissanruoka pyöräillä</textarea>
+<p class="pieni">Jos kohta 1 alleviivaa mutta tämä ei, selain tarkistaa kentät
+sivun kielen perusteella eikä suomen sanasto ole vielä oletuksena.</p>
+
+<div class="ohje">
+<h2>Jos kaikki alleviivautuu tai mikään ei alleviivaudu</h2>
+<p>Sanaston asentaminen ei yksin riitä: selain ei valitse sanastoa sen
+perusteella, mikä on asennettu, vaan kentän kielestä ja muistiin jääneestä
+valinnasta. Tuoreessa profiilissa valintaa ei ole, jolloin suomenkielinen
+teksti tarkistetaan englannin sanastolla.</p>
+<p>Napsauta tekstikenttää <strong>oikealla painikkeella</strong>:</p>
+<ol>
+  <li>Varmista että <em>Tarkista oikeinkirjoitus</em> on rastitettu.</li>
+  <li>Valitse <em>Kielet</em> → <strong>suomi</strong>.</li>
+</ol>
+<p>Firefoxissa valinta tallentuu asetukseen <code>spellchecker.dictionary</code>
+ja koskee jatkossa kaikkia kenttiä; sen voi asettaa myös suoraan
+<code>about:config</code>-sivulla arvoon <code>fi</code>.</p>
+</div>
+
+<h2>4. Tunnettuja aukkoja — nämä alleviivautuvat, vaikka ovat oikein</h2>
+<textarea spellcheck="true">tarkkailukehä koronarokote kirjoittaisimmekohan</textarea>
+<p class="pieni">Nämä kolme sanaa ovat oikeaa suomea, mutta Ginterin sanasto ei
+tunne niitä; Voikko tuntee. Ero on juuri se, mitä README:n kattavuustaulukko
+mittaa (88,0 % vs. 95,0 %). Selaimet eivät osaa käyttää Voikkoa, joten tämä
+aukko jää — se ei ole merkki rikkinäisestä asennuksesta.</p>

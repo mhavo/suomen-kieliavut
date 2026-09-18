@@ -1,0 +1,15 @@
+pkgbase = chromium-dict-fi
+	pkgdesc = Suomen oikolukusanasto Chromiumille ja QtWebEnginelle (.bdic, Ginter karsittuna)
+	pkgver = 0.9
+	pkgrel = 1
+	url = https://github.com/mhavo/suomen-kieliavut
+	install = chromium-dict-fi.install
+	arch = any
+	license = CC0-1.0
+	optdepends = chromium: profiiliin kopiointi, ks. asennusviesti
+	optdepends = qt6-webengine: lukee sanaston suoraan /usr/share/qt6/qtwebengine_dictionaries/:istä
+	optdepends = voikko-fi: morfologinen oikoluku työpöytäsovelluksiin — selaimet eivät osaa sitä
+	source = chromium-dict-fi-0.9-fi-FI.bdic::https://github.com/mhavo/suomen-kieliavut/releases/download/v0.9/fi-FI.bdic
+	sha256sums = 87aa3a9dde3a1354e3409401cd4c3d70f65a80dd71c40cfb5e54f7d41430a7eb
+
+pkgname = chromium-dict-fi

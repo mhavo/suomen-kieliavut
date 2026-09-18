@@ -1,0 +1,16 @@
+pkgbase = hyphen-fi
+	pkgdesc = Suomen tavutuskuviot libhyphenille ja LibreOfficelle (hyph_fi_FI.dic)
+	pkgver = 0.9
+	pkgrel = 1
+	url = https://github.com/mhavo/suomen-kieliavut
+	arch = any
+	license = LicenseRef-fihyph
+	optdepends = hyphen: libhyphen-kirjasto, joka lukee kuviot
+	optdepends = libreoffice-fresh: tavuttaa hunspell-reitillä näillä kuvioilla
+	optdepends = voikko-libreoffice: Voikko tavuttaa LibreOfficessa itse — tällöin näitä ei tarvita
+	source = hyphen-fi-0.9-hyph_fi_FI.dic::https://github.com/mhavo/suomen-kieliavut/releases/download/v0.9/hyph_fi_FI.dic
+	source = hyphen-fi-0.9-README_hyph_fi_FI.txt::https://github.com/mhavo/suomen-kieliavut/releases/download/v0.9/README_hyph_fi_FI.txt
+	sha256sums = 173ddce030554b91c94f01b5c629eadc224ba8f7ba7d385f6369c6a68565d3a6
+	sha256sums = acbf845507566773fb6a4b8e628cbaa8c57133244ebbf3a94d8d272380d0afd3
+
+pkgname = hyphen-fi

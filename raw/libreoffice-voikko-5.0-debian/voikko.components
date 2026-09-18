@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<components xmlns="http://openoffice.org/2010/uno-components">
+  <component loader="com.sun.star.loader.Python" uri="lovoikko.py">
+    <implementation name="org.puimula.ooovoikko.SettingsEventHandlerImplementation">
+      <service name="org.puimula.ooovoikko.SettingsEventHandlerService"/>
+    </implementation>
+    <implementation name="voikko.Hyphenator">
+      <service name="com.sun.star.linguistic2.Hyphenator"/>
+    </implementation>
+    <implementation name="voikko.SpellChecker">
+      <service name="com.sun.star.linguistic2.SpellChecker"/>
+    </implementation>
+    <implementation name="voikko.GrammarChecker">
+      <service name="com.sun.star.linguistic2.Proofreader"/>
+    </implementation>
+  </component>
+</components>

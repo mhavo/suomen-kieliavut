@@ -1,0 +1,4 @@
+AUR-paketin voikko-libreoffice 5.0-1 PKGBUILD ja asennusskripti, noudettu
+2026-09-09 (yay -G voikko-libreoffice). Kokonainen git-klooni siirrettiin
+hakemistoon ~/.cache/suomen-kieliavut/aur-clone; tänne jäivät vain nämä kaksi
+tiedostoa, joihin docs/arch-vs-debian.md viittaa.

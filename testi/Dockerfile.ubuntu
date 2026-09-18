@@ -1,0 +1,41 @@
+# Ubuntu 24.04 -testiympäristö.
+#
+# Kuvassa on VAIN hidas ja vakaa ympäristö (§2.1). Voikko-paketit puuttuvat
+# tarkoituksella (§2.2, R2): niiden asentaminen on asentimen työ ja juuri se
+# käytös jota testataan.
+#
+# SELAIMIA EI ASENNETA, vaikka §2.1 ne luettelee. Ubuntu 24.04:n chromium ja
+# firefox ovat snap-kääreitä, jotka eivät toimi kontissa lainkaan — eikä
+# kumpaakaan tarvita: profiilityökalut lukevat ja kirjoittavat pelkkiä
+# tiedostoja, profiilit tekee testi/valeprofiilit.sh, ja selaimen renderöinti
+# on nimenomaisesti rajattu ulos (R6). Tämä on tietoinen poikkeama §2.1:stä.
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=fi_FI.UTF-8
+
+# apt ei saa kysyä mitään: install.sh ajaa "sudo apt install" ilman -y:tä, ja
+# kysymykseen vastaaminen syötevirran kautta olisi hauras. Tämä on kuvan
+# ominaisuus, ei asentimen muutos — komento pysyy sinä jonka käyttäjä ajaa.
+RUN printf 'APT::Get::Assume-Yes "true";\nAPT::Get::Quiet "1";\n' \
+    > /etc/apt/apt.conf.d/90-testi-noninteractive
+
+# Pakettilistoja EI poisteta: install.sh:n voikko-osa tarvitsee indeksin.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates curl sudo jq unzip \
+        python3 python3-uno \
+        libreoffice-core libreoffice-writer libreoffice-common \
+        hunspell hunspell-en-us \
+        enchant-2 \
+        neovim \
+        locales util-linux \
+    && locale-gen fi_FI.UTF-8
+
+# Salasanaton sudo: kontissa ei ole ketään vastaamassa. Oikea käyttäjä
+# vastaisi salasanan, ja se vaihe ei ole tässä testissä mitattavana.
+RUN useradd -m -s /bin/bash testi \
+    && printf 'testi ALL=(ALL) NOPASSWD:ALL\n' > /etc/sudoers.d/testi \
+    && chmod 0440 /etc/sudoers.d/testi
+
+USER testi
+WORKDIR /home/testi

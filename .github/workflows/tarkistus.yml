@@ -1,0 +1,402 @@
+name: tarkistus
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  # julkaisu.yml kutsuu tämän ennen kuin se julkaisee mitään. Ilman tätä
+  # v*-tagi voisi julkaista artefaktit ilman yhtäkään tarkistusta.
+  workflow_call:
+    inputs:
+      aja_kattavuus:
+        description: >-
+          Ajetaanko kattavuusmittaus. Oletus on epätosi, eli push ja PR eivät
+          mittaa. Julkaisu asettaa tämän todeksi.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Asenna shellcheck
+        run: sudo apt-get update -qq && sudo apt-get install -y shellcheck
+      - name: Aja shellcheck
+        # install.sh on repon juuressa eikä siis osu tools/*.sh:hon. Se on
+        # nimenomaan se skripti jonka käyttäjä ajaa putkessa verkosta, joten
+        # sen jättäminen tarkistamatta olisi väärin päin.
+        run: shellcheck tools/*.sh install.sh
+
+  prefikirjoittajat:
+    name: Profiilien pref-kirjoittajat
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: pref-kirjoitus.py ja prefs-js-kirjoitus.py toimivat
+        # Nämä kaksi kirjoittavat käyttäjän selainprofiiliin. Virhe niissä ei
+        # näy väärinä tuloksina vaan rikkoutuneena profiilina: Chromium nollaa
+        # profiilin jos Preferences ei jäsenny, Firefox nimeää prefs.js:n
+        # Invalidprefs.js:ksi ja nollaa asetukset. Siksi ne testataan
+        # oikeasti ajamalla eikä pelkällä syntaksitarkistuksella.
+        run: |
+          set -euo pipefail
+          tyo="$(mktemp -d)"
+          trap 'rm -rf "$tyo"' EXIT
+
+          # --- Chromium: pref-kirjoitus.py -------------------------------------------
+          echo '{"spellcheck":{"dictionaries":["en-US"]}}' > "$tyo/Preferences"
+
+          python3 tools/pref-kirjoitus.py tarkista "$tyo/Preferences" fi && tarve=0 || tarve=$?
+          [ "$tarve" = 0 ] || { echo "ERROR: muutoksen olisi pitänyt olla tarpeen" >&2; exit 1; }
+
+          python3 tools/pref-kirjoitus.py kirjoita "$tyo/Preferences" fi >/dev/null
+          python3 - "$tyo/Preferences" <<'PY'
+          import json, sys
+          p = json.load(open(sys.argv[1]))
+          assert p["spellcheck"]["dictionaries"] == ["en-US", "fi"], p
+          assert p["browser"]["enable_spellchecking"] is True, p
+          PY
+
+          # Toinen ajo ei saa enää nähdä tarvetta: ilman tätä jokainen ajo jättäisi
+          # turhan varmuuskopion profiiliin.
+          python3 tools/pref-kirjoitus.py tarkista "$tyo/Preferences" fi && tarve=0 || tarve=$?
+          [ "$tarve" = 1 ] || { echo "ERROR: ei saisi olla enää tarvetta (sai $tarve)" >&2; exit 1; }
+
+          # Eksplisiittistä false-arvoa ei ohiteta ilman --pakota-oikoluku.
+          echo '{"spellcheck":{"dictionaries":["fi"]},"browser":{"enable_spellchecking":false}}' > "$tyo/Preferences"
+          python3 tools/pref-kirjoitus.py tarkista "$tyo/Preferences" fi && tarve=0 || tarve=$?
+          [ "$tarve" = 1 ] || { echo "ERROR: false on käyttäjän valinta, ei saa muuttaa" >&2; exit 1; }
+
+          # Rikkinäiseen tiedostoon ei kosketa.
+          printf 'ei jsonia' > "$tyo/Preferences"
+          python3 tools/pref-kirjoitus.py tarkista "$tyo/Preferences" fi && tarve=0 || tarve=$?
+          [ "$tarve" = 2 ] || { echo "ERROR: rikkinäisestä pitää tulla 2 (sai $tarve)" >&2; exit 1; }
+          echo "pref-kirjoitus.py OK"
+
+          # --- Firefox: prefs-js-kirjoitus.py ----------------------------------------
+          printf '// Mozilla User Preferences\n\nuser_pref("browser.startup.homepage", "about:blank");\n' \
+              > "$tyo/prefs.js"
+
+          python3 tools/prefs-js-kirjoitus.py tarkista "$tyo/prefs.js" /jaettu && tarve=0 || tarve=$?
+          [ "$tarve" = 0 ] || { echo "ERROR: muutoksen olisi pitänyt olla tarpeen" >&2; exit 1; }
+
+          python3 tools/prefs-js-kirjoitus.py kirjoita "$tyo/prefs.js" /jaettu >/dev/null
+          grep -qxF 'user_pref("spellchecker.dictionary_path", "/jaettu");' "$tyo/prefs.js"
+          grep -qxF 'user_pref("spellchecker.dictionary", "fi-FI");' "$tyo/prefs.js"
+          # Muu sisältö säilyy rivi riviltä.
+          grep -qxF 'user_pref("browser.startup.homepage", "about:blank");' "$tyo/prefs.js"
+          grep -qxF '// Mozilla User Preferences' "$tyo/prefs.js"
+
+          python3 tools/prefs-js-kirjoitus.py tarkista "$tyo/prefs.js" /jaettu && tarve=0 || tarve=$?
+          [ "$tarve" = 1 ] || { echo "ERROR: ei saisi olla enää tarvetta (sai $tarve)" >&2; exit 1; }
+
+          # Olemassa olevaa kielivalintaa ei ylikirjoiteta: .xpi-lisäosan käyttäjällä
+          # arvo on "fi", ja sen vaihtaminen rikkoisi toimivan asetuksen.
+          printf 'user_pref("spellchecker.dictionary", "fi");\n' > "$tyo/prefs.js"
+          python3 tools/prefs-js-kirjoitus.py kirjoita "$tyo/prefs.js" /jaettu >/dev/null
+          grep -qxF 'user_pref("spellchecker.dictionary", "fi");' "$tyo/prefs.js"
+
+          # Polun vaihtuminen huomataan.
+          python3 tools/prefs-js-kirjoitus.py tarkista "$tyo/prefs.js" /toinen && tarve=0 || tarve=$?
+          [ "$tarve" = 0 ] || { echo "ERROR: polun vaihdon pitää näkyä (sai $tarve)" >&2; exit 1; }
+
+          # Rikkinäiseen tiedostoon ei kosketa.
+          printf '\xff\xfe binaarista' > "$tyo/prefs.js"
+          python3 tools/prefs-js-kirjoitus.py tarkista "$tyo/prefs.js" /jaettu && tarve=0 || tarve=$?
+          [ "$tarve" = 2 ] || { echo "ERROR: rikkinäisestä pitää tulla 2 (sai $tarve)" >&2; exit 1; }
+          echo "prefs-js-kirjoitus.py OK"
+
+  summat:
+    name: Tarkistussummat
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build/ ja dict/ vastaavat SHA256SUMS-tiedostoa
+        run: sha256sum -c SHA256SUMS
+
+      - name: install.sh:n upotetut summat vastaavat SHA256SUMS-tiedostoa
+        # Etäasennin ajetaan ilman repon klonia, joten se ei voi lukea
+        # SHA256SUMS-tiedostoa — summat on upotettava skriptiin. Kaksi kopiota
+        # samasta totuudesta erkaantuu ennen pitkää, ja erkaantuminen näkyy
+        # käyttäjälle sanomana "SHA-256 EI TÄSMÄÄ": se näyttää hyökkäykseltä
+        # vaikka kyse on unohduksesta. Tämä portti estää sen.
+        run: |
+          set -euo pipefail
+          virheita=0
+          loydetyt=0
+          # Rivin muoto on
+          #   SUMMA_<tunnus>="<summa>"   # <polku repossa>
+          # ja polku on portin olennainen osa: pelkkä summan etsiminen mistä
+          # tahansa SHA256SUMS-rivistä hyväksyisi myös väärään muuttujaan
+          # kopioidun summan. Vaaditaan siis täsmälleen rivi "<summa>  <polku>".
+          while IFS= read -r rivi; do
+            nimi="${rivi%%=*}"
+            summa="${rivi#*=\"}"; summa="${summa%%\"*}"
+            polku="${rivi##*#}"; polku="${polku# }"
+            loydetyt=$((loydetyt + 1))
+            if grep -qxF "$summa  $polku" SHA256SUMS; then
+              printf '%-26s %s\n' "$nimi" "$polku"
+            else
+              printf '%-26s EI TÄSMÄÄ: odotettiin SHA256SUMS-riviä\n' "$nimi" >&2
+              printf '%s  %s\n' "$summa" "$polku" >&2
+              printf '  SHA256SUMS sanoo tästä tiedostosta:\n' >&2
+              grep -F "  $polku" SHA256SUMS >&2 || printf '  (ei riviä lainkaan)\n' >&2
+              virheita=$((virheita + 1))
+            fi
+          done < <(grep -E '^SUMMA_[A-Za-z0-9_]+="[0-9a-f]{64}" +# +\S+$' install.sh)
+          # Jos rivien muoto muuttuu niin ettei säännöllinen lauseke enää osu,
+          # silmukka ei aja kertaakaan ja portti menisi hiljaa läpi. Odotettu
+          # määrä on siksi kirjattu tähän.
+          echo "tarkistettuja summarivejä: $loydetyt"
+          # 5 sanastoa + 2 Chromium-osan työkalua (lisätty 2026-09-18: putkessa
+          # ajettu asennin ei voi lukea niitä repon työkopiosta) + Firefox-osan
+          # 2 työkalua ja Ginterin lähdepari .aff + .dic.
+          [ "$loydetyt" -eq 11 ] || { echo "install.sh:n summarivien määrä muuttui (odotettiin 11) — päivitä tämä portti" >&2; exit 1; }
+          [ "$virheita" -eq 0 ]
+
+      - name: AUR-PKGBUILDien summat vastaavat SHA256SUMS-tiedostoa
+        # Kolmas kopio samoista summista. Aiemmin tätä ei valvonut mikään, ja
+        # unohdus ei näkynyt missään ennen kuin makepkg kaatui KÄYTTÄJÄN
+        # koneella sanomaan "One or more files did not pass the validity
+        # check" — eli AUR-paketti rikkoutui hiljaa vasta asennettaessa.
+        #
+        # PKGBUILDin source-rivi on muotoa
+        #   <paikallinen-nimi>::<url>/<tiedosto>
+        # ja sha256sums-taulukon alkiot ovat samassa järjestyksessä. Portti
+        # lukee parit .SRCINFO:sta, koska se on tasainen avain=arvo-muoto eikä
+        # vaadi PKGBUILDin suorittamista.
+        run: |
+          set -euo pipefail
+          virheita=0
+          tarkistettuja=0
+          for srcinfo in packaging/aur/*/.SRCINFO; do
+            paketti="$(basename "$(dirname "$srcinfo")")"
+            mapfile -t lahteet < <(sed -n 's/^\tsource = //p' "$srcinfo")
+            mapfile -t summat  < <(sed -n 's/^\tsha256sums = //p' "$srcinfo")
+            if [ "${#lahteet[@]}" -ne "${#summat[@]}" ]; then
+              echo "$paketti: source- ja sha256sums-rivejä eri määrä" >&2
+              virheita=$((virheita + 1)); continue
+            fi
+            for i in "${!lahteet[@]}"; do
+              tiedosto="${lahteet[$i]##*/}"
+              summa="${summat[$i]}"
+              tarkistettuja=$((tarkistettuja + 1))
+              # Julkaisun liitteen nimi vastaa repon tiedoston perusnimeä.
+              osumat="$( grep -E "  .*/${tiedosto}\$" SHA256SUMS || true )"
+              polku="$(sed -n '1s/^[0-9a-f]*  //p' <<< "$osumat")"
+              if [ -z "$polku" ]; then
+                # README_hyph_fi_FI.txt ei ole SHA256SUMS-tiedostossa; se on
+                # muuttumaton lähdetiedosto, jonka summa lasketaan tässä.
+                if [ -f "dict/hyphen/$tiedosto" ]; then
+                  polku="dict/hyphen/$tiedosto"
+                else
+                  echo "$paketti: $tiedosto — ei löydy SHA256SUMS:ista eikä dict/hyphen/:istä" >&2
+                  virheita=$((virheita + 1)); continue
+                fi
+              fi
+              todellinen="$(sha256sum "$polku" | cut -d' ' -f1)"
+              if [ "$summa" = "$todellinen" ]; then
+                printf '%-20s %-28s %s\n' "$paketti" "$tiedosto" "ok"
+              else
+                printf '%-20s %-28s EI TÄSMÄÄ\n' "$paketti" "$tiedosto" >&2
+                printf '  PKGBUILD: %s\n  repo:     %s (%s)\n' "$summa" "$todellinen" "$polku" >&2
+                virheita=$((virheita + 1))
+              fi
+            done
+          done
+          echo "tarkistettuja PKGBUILD-summia: $tarkistettuja"
+          [ "$tarkistettuja" -ge 4 ] || { echo "odotettiin vähintään 4 summaa — .SRCINFO-muoto muuttui?" >&2; exit 1; }
+          [ "$virheita" -eq 0 ]
+
+  sanastot:
+    name: Sanastojen rakenne
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rivimäärät vastaavat .dic-otsakkeita
+        run: |
+          set -euo pipefail
+          # hunspell-.dic:n ensimmäinen rivi ilmoittaa sanuemäärän. Jos se ei
+          # vastaa todellista rivimäärää, sanasto on typistynyt tai korruptoitunut.
+          tarkista() {
+            local f="$1" enc="$2"
+            local otsake rivit
+            # head ENNEN iconvia, ei perässä: iconv koko tiedostosta head -1:een
+            # kuolee SIGPIPEen heti kun head sulkee putken, ja pipefail nappaa sen.
+            # wc -l ei tarvitse iconvia lainkaan — rivinvaihto on sama tavu
+            # molemmissa merkistöissä.
+            otsake=$(head -1 "$f" | iconv -f "$enc" -t UTF-8 | tr -d '\r')
+            rivit=$(( $(wc -l < "$f") - 1 ))
+            printf '%-40s otsake=%s rivejä=%s\n' "$f" "$otsake" "$rivit"
+            [ "$otsake" = "$rivit" ] || { echo "ERROR: $f otsake ja rivimäärä eivät täsmää" >&2; return 1; }
+          }
+          tarkista dict/ginter/fi_FI.dic            UTF-8
+          tarkista dict/ginter-karsittu/fi_FI.dic   UTF-8
+          tarkista dict/myspell-fi-0.7/fi-FI.dic    ISO8859-1
+
+      - name: Karsittu sanasto on 245 000 sanuetta
+        run: |
+          n=$(( $(wc -l < dict/ginter-karsittu/fi_FI.dic) - 1 ))
+          echo "karsittu: $n"
+          [ "$n" -eq 245000 ]
+
+      - name: .aff-merkistöt ovat odotetut
+        run: |
+          set -euo pipefail
+          # Ei putkea grep -q:hun: se sulkisi putken ja lähettäisi SIGPIPEn.
+          [ "$(head -1 dict/ginter/fi_FI.aff | tr -d '\r')" = 'SET UTF-8' ]
+          [ "$(head -1 dict/myspell-fi-0.7/fi-FI.aff | tr -d '\r')" = 'SET ISO8859-1' ]
+
+      - name: Karsittu on aito osajoukko koko sanastosta
+        run: |
+          set -euo pipefail
+          # Karsittu .dic on valittava alkuperäisestä ALKUPERÄISESSÄ
+          # järjestyksessä, tai convert_dict hylkää sen virheeseen
+          # "Index doesn't match, word #...". Tarkistetaan molemmat.
+          tail -n +2 dict/ginter-karsittu/fi_FI.dic > /tmp/kar
+          tail -n +2 dict/ginter/fi_FI.dic          > /tmp/koko
+
+          puuttuu=$(awk 'NR==FNR{k[$0]=1;next} !($0 in k){c++} END{print c+0}' /tmp/koko /tmp/kar)
+          echo "karsitussa rivejä joita ei ole kokonaisessa: $puuttuu"
+          [ "$puuttuu" -eq 0 ]
+
+          awk 'NR==FNR{k[$0]=1;next} ($0 in k){print FNR}' /tmp/kar /tmp/koko > /tmp/idx
+          echo "osumia kokonaisessa: $(wc -l < /tmp/idx)"
+          sort -c -n /tmp/idx && echo "alkuperäinen järjestys säilynyt"
+
+  bdic:
+    name: .bdic-otsakkeet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Jokainen .bdic on BDic-versio 2
+        run: |
+          set -euo pipefail
+          for f in build/*.bdic; do
+            otsake=$(od -A n -t x1 -N 8 "$f" | tr -d ' ')
+            printf '%-40s %s\n' "$f" "$otsake"
+            [ "$otsake" = "4244696302000000" ] || { echo "ERROR: $f ei ole BDic v2" >&2; exit 1; }
+          done
+
+  xpi:
+    name: XPI:n sisältö
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Mukana oleva .xpi on upstreamin alkuperäinen
+        run: |
+          set -euo pipefail
+          # build/fi-spell-0.2.xpi EI ole täällä rakennettu, vaan Filip Ginterin
+          # release 0.2 sellaisenaan. Tämä varmistaa ettei sitä ole vaihdettu.
+          odotettu=95ded62bc3de347c91d7c91e8d2abb2405e3475bfb7bf735070db11198131a81
+          saatu=$(sha256sum build/fi-spell-0.2.xpi | cut -d' ' -f1)
+          echo "$saatu"
+          [ "$saatu" = "$odotettu" ]
+
+      # Tämä on se tiedosto jonka käyttäjä oikeasti asentaa. Aiemmin CI
+      # validoi vain alla rakennettavan fi-spell-oma-*.xpi:n, eli testasi eri
+      # artefaktin kuin julkaisi.
+      - name: Jaeltava .xpi on kelvollinen sanastolaajennus
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq && sudo apt-get install -y unzip
+          out=build/fi-spell-0.2.xpi
+          # Listaus muuttujaan ennen grepiä: grep -q sulkee putken ensimmäiseen
+          # osumaan, jolloin unzip kuolee SIGPIPEen ja pipefail nappaa sen.
+          listaus=$(unzip -l "$out")
+          grep -q 'dictionaries/fi_FI/fi_FI.dic' <<< "$listaus"
+          grep -q 'dictionaries/fi_FI/fi_FI.aff' <<< "$listaus"
+          tools/tarkista-manifest.py "$out"
+
+      - name: Rakennettu .xpi on kelvollinen sanastolaajennus
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq && sudo apt-get install -y zip unzip
+          tools/build-xpi.sh 0.2.1 karsittu
+          out=build/fi-spell-oma-0.2.1.xpi
+          listaus=$(unzip -l "$out")
+          echo "$listaus"
+          # Pakolliset tiedostot
+          grep -q 'dictionaries/fi_FI/fi_FI.dic' <<< "$listaus"
+          grep -q 'dictionaries/fi_FI/fi_FI.aff' <<< "$listaus"
+          # Omassa paketissa on oltava nykyaikainen avain; ks. tarkista-manifest.py
+          tools/tarkista-manifest.py "$out"
+
+  oxt:
+    name: LibreOffice-sanastolaajennus
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Asenna zip
+        run: sudo apt-get update -qq && sudo apt-get install -y zip unzip
+
+      - name: Mukana toimitettu .oxt on kelvollinen
+        run: tools/tarkista-oxt.py build/fi-hunspell-0.9.oxt 0.9
+
+      - name: Kaikki kolme sanastovarianttia kääntyvät
+        run: |
+          set -euo pipefail
+          # Kukin variantti kirjoittuu samaan nimeen (sanasto ei ole osa
+          # tiedostonimeä), joten ajojärjestys ratkaisee mikä jää jäljelle.
+          # Ginter viimeisenä, jotta lopputila vastaa toimitettua pakettia.
+          for sanasto in myspell karsittu ginter; do
+            tools/build-oxt.sh 9.9 "$sanasto"
+            tools/tarkista-oxt.py build/fi-hunspell-9.9.oxt 9.9
+          done
+
+      - name: Toimitettua .oxt:tä ei ole ylikirjoitettu
+        # Rakennusajot käyttävät versiota 9.9 juuri siksi, ettei 0.9 voi
+        # vahingossa vaihtua CI:ssä. Tämä varmistaa sen.
+        run: sha256sum -c --ignore-missing SHA256SUMS
+
+  kattavuus:
+    name: Kattavuusmittaus
+    # Ei kuulu jatkuvaan tarkkailuun. Kattavuus on sanastodatan ominaisuus:
+    # se muuttuu vain kun sanasto tai korpus vaihtuu, ei kun skriptiä
+    # muokataan. Siksi sitä ei mitata joka pushista — luvut lasketaan
+    # lokaalisti silloin tällöin ja kirjataan README.md:hen ja
+    # docs/sanastot.md:hen.
+    #
+    # Ajetaan kahdessa tilanteessa:
+    #   - v*-tagin julkaisu (julkaisu.yml antaa aja_kattavuus: true), jotta
+    #     julkaistut luvut on todettu sillä commitilla joka julkaistaan
+    #   - workflow_dispatch, eli käsin käynnistettynä
+    if: ${{ inputs.aja_kattavuus || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Asenna hunspell
+        run: sudo apt-get update -qq && sudo apt-get install -y hunspell
+      - name: Aja mittaus
+        run: tools/arvioi-korpuksella.sh | tee /tmp/kattavuus.txt
+      - name: Kattavuus ei ole romahtanut
+        run: |
+          set -euo pipefail
+          # Skripti tulostaa taulukoiden lisäksi koneluettavat rivit
+          #   KONE<TAB>sanasto<TAB>mitta<TAB>osakorpus<TAB>kattavuus<TAB>n
+          # Portti lukee niitä, jotta taulukon muotoilua voi muuttaa vapaasti.
+          # Rajat ovat väljiä: hunspell-version vaihtuminen ei saa rikkoa ajoa,
+          # portti pysäyttää vain aidon regression. Mitatut arvot ovat
+          # docs/sanastot.md:ssä; Voikko ei ole portissa, koska GitHubin
+          # ajurikuvassa ei ole voikkospelliä.
+          tarkista() {
+            local sanasto="$1" raja="$2" arvo
+            arvo="$(awk -F'\t' -v s="$sanasto" \
+                     '$1=="KONE" && $2==s && $3=="types" && $4=="YHTEENSÄ" {print $5}' \
+                     /tmp/kattavuus.txt)"
+            [ -n "$arvo" ] || { echo "sanaston '$sanasto' KONE-riviä ei löytynyt" >&2; exit 1; }
+            echo "$sanasto: $arvo % (vähintään $raja %)"
+            awk -v a="$arvo" -v r="$raja" 'BEGIN{exit !(a>=r)}'
+          }
+          # Mitatut arvot 2026-09-16: ginter 88,0 / karsittu 76,4 / myspell 47,3.
+          tarkista ginter    85.0
+          tarkista karsittu  73.0
+          tarkista myspell   44.0
